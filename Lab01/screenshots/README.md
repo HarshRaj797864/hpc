@@ -3,11 +3,18 @@
 Capture these yourself — a screenshot is evidence that *you* ran the tool on
 *your* machine, so generating them automatically would defeat the purpose.
 
-Build first, and set `$PERF` — on WSL2 the plain `perf` wrapper fails to find a
-binary matching the running kernel, so call the versioned one directly:
+## Run this first — in the same terminal you take the screenshots from
+
+`$PERF` only exists in the shell where you export it. If you open a new tab, or
+skip straight to a table row below, `$PERF --version` becomes bare `--version`
+and bash reports `command not found`. Re-run this block if that happens.
+
+On WSL2 the plain `perf` wrapper cannot find a binary matching the running
+kernel, so we locate the versioned one instead:
 
 ```bash
-export PERF=/usr/lib/linux-tools-5.15.0-187/perf   # adjust if your version differs
+export PERF=$(ls /usr/lib/linux-tools-*/perf | head -1)
+echo "$PERF"          # should print a path, not an empty line
 
 gcc -O0 -pg mysort.c -o mysort
 gcc -O2 -pg mysort.c -o mysort_O2

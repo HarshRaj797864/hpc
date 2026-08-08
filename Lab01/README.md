@@ -66,8 +66,9 @@ gcc -O3 -pg mysort.c -o mysort_O3
 ./mysort_O3   && time ./mysort_O3   && gprof ./mysort_O3 gmon.out > report_O3.txt
 
 # Hardware counters. On WSL2 the perf wrapper cannot find a matching binary,
-# so call the versioned one directly (see section 7.1).
-/usr/lib/linux-tools-5.15.0-187/perf stat ./mysort
+# so locate the versioned one instead (see section 7.1).
+export PERF=$(ls /usr/lib/linux-tools-*/perf | head -1)
+$PERF stat ./mysort
 
 # Simulated counters - instructions, cache refs/misses, branch misses (7.2)
 valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
@@ -383,8 +384,12 @@ Install the generic tools and call the versioned binary directly — the
 
 ```bash
 sudo apt install -y linux-tools-generic
-/usr/lib/linux-tools-5.15.0-187/perf stat ./mysort
+export PERF=$(ls /usr/lib/linux-tools-*/perf | head -1)
+$PERF stat ./mysort
 ```
+
+The path is version-specific (here `linux-tools-5.15.0-187`), so resolving it
+with a glob rather than hard-coding it survives the next kernel update.
 
 The probe is a dozen lines — save as `perf_probe.c`, build with
 `gcc -O0 perf_probe.c -o perf_probe`, and run it to reproduce the output above:
