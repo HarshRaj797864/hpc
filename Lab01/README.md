@@ -372,20 +372,73 @@ perf stat -e task-clock,context-switches,page-faults,cycles,instructions,\
 cache-references,cache-misses,branch-instructions,branch-misses ./mysort
 ```
 
-## 7.2 Substitute measurements
+## 7.2 What could and could not be measured
 
-Since the PMU is unavailable, the metrics were obtained by other means:
+Being explicit about this, because a comparison table with invented numbers is
+worse than one with honest gaps:
 
-| Metric | How it was obtained here |
+| Metric | Status on this machine |
 |---|---|
-| Execution time | `CLOCK_MONOTONIC` + `time` (§5) |
-| Instructions | Cachegrind simulation + exact operation counts (§6.3) |
-| Cache refs / misses | Cachegrind simulation |
-| Branch misses | Cachegrind simulation |
-| IPC | **Not obtainable** — requires a real cycle counter |
-| Hotspot function | gprof (§6) |
+| Execution time | **Measured** — `CLOCK_MONOTONIC` + `time` (§5) |
+| Hotspot function | **Measured** — gprof (§6) |
+| Instruction count | **Not measured.** Exact *operation* counts stand in — 166,521,222 vs 302,516 comparisons (§6.3) |
+| CPU cycles | **Not measured** — no PMU |
+| IPC | **Not measured** — needs both cycles and instructions |
+| Cache references / misses | **Not measured directly.** Cache *effects* are visible in timing (§9) |
+| Branch misses | **Not measured** — no PMU |
 
-<!-- PERF_RESULTS_PLACEHOLDER -->
+Three of the seven rows the lab asks for cannot be filled on this hardware, and
+no substitute tool was run. What partially covers the gap:
+
+- **Instruction count → operation count.** The `-DCOUNTERS` build counts
+  comparisons and swaps exactly (§6.3), which is the algorithmically meaningful
+  quantity. It is not an instruction count, but it explains the performance
+  difference better than one would: 550× more comparisons.
+- **Cache behaviour → timing evidence.** §9 shows quicksort tracking n log n
+  closely up to ~2 M elements, then drifting above prediction (2.29×, 2.50× per
+  doubling against ~2.09× predicted) exactly as the working set passes the 12 MB
+  L3. That is empirical evidence of cache pressure inferred from timing, not a
+  miss-rate measurement.
+
+**To fill the table properly**, either run on native (non-virtualised) Linux
+with the `perf stat` command in §7.1, or simulate the counters with Cachegrind,
+which does not need a PMU:
+
+```bash
+sudo apt install -y valgrind
+valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
+         ./mysort_bench 8000 --bubble-only
+valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
+         ./mysort_bench 8000 --quick-only
+```
+
+Cachegrind reports instruction counts (`Ir`), cache references and misses
+(`D1`, `LLd`) and branch mispredictions (`Bcm`). Note it *simulates* a cache
+model rather than reading hardware counters — the numbers are architecturally
+faithful but not cycle-exact, and it runs roughly 50× slower than native, hence
+the reduced N.
+
+## 7.3 Performance comparison table
+
+The comparison the lab asks for, at N = 18,250, `-O2` without `-pg`:
+
+| Metric | Bubble Sort | Quick Sort | Ratio |
+|---|---:|---:|---:|
+| Execution time | 0.174504 s | 0.000932 s | **187×** |
+| CPU cycles | *unavailable — no PMU* | *unavailable* | — |
+| Instructions | *unavailable — no PMU* | *unavailable* | — |
+| IPC | *unavailable — no PMU* | *unavailable* | — |
+| Cache references | *unavailable — no PMU* | *unavailable* | — |
+| Cache misses | *unavailable — no PMU* | *unavailable* | — |
+| Branch misses | *unavailable — no PMU* | *unavailable* | — |
+| **Comparisons** (measured) | 166,521,222 | 302,516 | **550×** |
+| **Swaps** (measured) | 82,757,197 | 161,906 | **511×** |
+| **Hotspot function** | `bubbleSort` 73.53%<br>(`swap` 23.53%) | `partition` 78.57% | — |
+
+The rows marked unavailable are a property of this machine (§7.1), not an
+omission. The two measured operation-count rows carry the same explanatory
+weight the instruction count would have: bubble sort loses because it does 550×
+more work, and that conclusion does not depend on a PMU.
 
 ---
 
