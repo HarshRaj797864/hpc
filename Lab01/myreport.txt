@@ -3,16 +3,16 @@ Flat profile:
 Each sample counts as 0.01 seconds.
   %   cumulative   self              self     total           
  time   seconds   seconds    calls  ms/call  ms/call  name    
- 73.53      0.25     0.25        1   250.00   329.84  bubbleSort
- 23.53      0.33     0.08 82919103     0.00     0.00  swap
-  2.94      0.34     0.01        2     5.00     5.00  is_sorted
-  0.00      0.34     0.00    12273     0.00     0.00  partition
-  0.00      0.34     0.00        4     0.00     0.00  cpu_seconds
-  0.00      0.34     0.00        4     0.00     0.00  wall_seconds
-  0.00      0.34     0.00        2     0.00   165.00  dispatch
-  0.00      0.34     0.00        2     0.00   170.00  run_one
-  0.00      0.34     0.00        1     0.00     0.00  generate_temperatures
-  0.00      0.34     0.00        1     0.00     0.16  quickSort
+ 69.57      0.16     0.16        1   160.00   214.89  bubbleSort
+ 23.91      0.21     0.06 82919103     0.00     0.00  swap
+  6.52      0.23     0.01        2     7.50     7.50  is_sorted
+  0.00      0.23     0.00    12273     0.00     0.00  partition
+  0.00      0.23     0.00        4     0.00     0.00  cpu_seconds
+  0.00      0.23     0.00        4     0.00     0.00  wall_seconds
+  0.00      0.23     0.00        2     0.00   107.50  dispatch
+  0.00      0.23     0.00        2     0.00   115.00  run_one
+  0.00      0.23     0.00        1     0.00     0.00  generate_temperatures
+  0.00      0.23     0.00        1     0.00     0.11  quickSort
 
  %         the percentage of the total running time of the
 time       program used by this function.
@@ -50,36 +50,36 @@ notice and this notice are preserved.
 		     Call graph (explanation follows)
 
 
-granularity: each sample hit covers 4 byte(s) for 2.94% of 0.34 seconds
+granularity: each sample hit covers 4 byte(s) for 4.35% of 0.23 seconds
 
 index % time    self  children    called     name
-                0.00    0.34       2/2           main [2]
-[1]    100.0    0.00    0.34       2         run_one [1]
-                0.00    0.33       2/2           dispatch [3]
+                0.00    0.23       2/2           main [2]
+[1]    100.0    0.00    0.23       2         run_one [1]
+                0.00    0.21       2/2           dispatch [3]
                 0.01    0.00       2/2           is_sorted [6]
                 0.00    0.00       4/4           cpu_seconds [9]
                 0.00    0.00       4/4           wall_seconds [10]
 -----------------------------------------------
                                                  <spontaneous>
-[2]    100.0    0.00    0.34                 main [2]
-                0.00    0.34       2/2           run_one [1]
+[2]    100.0    0.00    0.23                 main [2]
+                0.00    0.23       2/2           run_one [1]
                 0.00    0.00       1/1           generate_temperatures [11]
 -----------------------------------------------
-                0.00    0.33       2/2           run_one [1]
-[3]     97.1    0.00    0.33       2         dispatch [3]
-                0.25    0.08       1/1           bubbleSort [4]
+                0.00    0.21       2/2           run_one [1]
+[3]     93.5    0.00    0.21       2         dispatch [3]
+                0.16    0.05       1/1           bubbleSort [4]
                 0.00    0.00       1/1           quickSort [8]
 -----------------------------------------------
-                0.25    0.08       1/1           dispatch [3]
-[4]     97.0    0.25    0.08       1         bubbleSort [4]
-                0.08    0.00 82757197/82919103     swap [5]
+                0.16    0.05       1/1           dispatch [3]
+[4]     93.4    0.16    0.05       1         bubbleSort [4]
+                0.05    0.00 82757197/82919103     swap [5]
 -----------------------------------------------
                 0.00    0.00  161906/82919103     partition [7]
-                0.08    0.00 82757197/82919103     bubbleSort [4]
-[5]     23.5    0.08    0.00 82919103         swap [5]
+                0.05    0.00 82757197/82919103     bubbleSort [4]
+[5]     23.9    0.06    0.00 82919103         swap [5]
 -----------------------------------------------
                 0.01    0.00       2/2           run_one [1]
-[6]      2.9    0.01    0.00       2         is_sorted [6]
+[6]      6.5    0.01    0.00       2         is_sorted [6]
 -----------------------------------------------
                 0.00    0.00   12273/12273       quickSort [8]
 [7]      0.0    0.00    0.00   12273         partition [7]

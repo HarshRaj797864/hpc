@@ -23,8 +23,8 @@ bottleneck with GPROF and PERF, and make a recommendation.
 | Which algorithm is faster? | **Quick Sort**, by **187×** at N = 18,250 and by **12,433×** at N = 1,000,000 |
 | Bubble Sort @ 1,000,000 records | **871.8 s** (14 min 32 s) — *measured, not extrapolated* |
 | Quick Sort @ 1,000,000 records | **0.070 s** |
-| Top hotspot (Bubble, `-O0`) | `bubbleSort` — 73.53% of CPU time |
-| Second hotspot (Bubble, `-O0`) | `swap` — 23.53%, over **82.9 million calls** |
+| Top hotspot (Bubble, `-O0`) | `bubbleSort` — 69.57% of CPU time |
+| Second hotspot (Bubble, `-O0`) | `swap` — 23.91%, over **82.9 million calls** |
 | Top hotspot (Quick, `-O0`) | `partition` — 78.57% of CPU time |
 | Best compiler setting | **`-O2`** — and `-O3` is **3.1× *slower*** than `-O2` here (see §8) |
 
@@ -205,34 +205,44 @@ so the minimum is the closest estimate of true cost.
 ```
   %   cumulative   self              self     total
  time   seconds   seconds    calls  ms/call  ms/call  name
- 73.53      0.25     0.25        1   250.00   329.84  bubbleSort
- 23.53      0.33     0.08 82919103     0.00     0.00  swap
-  2.94      0.34     0.01        2     5.00     5.00  is_sorted
-  0.00      0.34     0.00    12273     0.00     0.00  partition
+ 69.57      0.16     0.16        1   160.00   214.89  bubbleSort
+ 23.91      0.21     0.06 82919103     0.00     0.00  swap
+  6.52      0.23     0.01        2     7.50     7.50  is_sorted
+  0.00      0.23     0.00    12273     0.00     0.00  partition
 ```
 
-- **Hotspot: `bubbleSort`, 73.53% of CPU time.**
-- **Second: `swap`, 23.53%, across 82,919,103 calls.** Individually `swap` is
+- **Hotspot: `bubbleSort`, 69.57% of CPU time.**
+- **Second: `swap`, 23.91%, across 82,919,103 calls.** Individually `swap` is
   three instructions; collectively it is a quarter of the runtime, purely
   because it is *called 82.9 million times*. This is the classic profiling
   lesson: cost = unit cost × call count, and the call count dominates here.
 - Everything else is noise. `partition` (all of quicksort's real work) does not
   register at all.
 
+**Two columns, two kinds of number.** The `calls` column is exact — `mcount`
+instrumentation counts every call. The `% time` column is statistical, built
+from 10 ms samples, and moves between runs: repeating this profile gives
+`bubbleSort` anywhere from roughly 69% to 74%, while `swap` stays pinned at
+82,919,103 calls every single time. Quote the call counts as fact; treat the
+percentages as estimates with error bars. The figures above are from the
+`myreport.txt` committed alongside this document.
+
 ## 6.2 Call graph
 
 ```
-                0.12    0.03       1/1           run_one
-[3]     91.1    0.12    0.03       1         bubbleSort [3]
-                0.03    0.00 82757197/82919103     swap [5]
+                0.16    0.05       1/1           dispatch [3]
+[4]     93.4    0.16    0.05       1         bubbleSort [4]
+                0.05    0.00 82757197/82919103     swap [5]
 -----------------------------------------------
                 0.00    0.00  161906/82919103     partition [7]
-                0.03    0.00 82757197/82919103     bubbleSort [3]
-[5]     20.6    0.04    0.00 82919103         swap [5]
+                0.05    0.00 82757197/82919103     bubbleSort [4]
+[5]     23.9    0.06    0.00 82919103         swap [5]
 -----------------------------------------------
                                24546             quickSort [8]
+                0.00    0.00       1/1           dispatch [3]
 [8]      0.0    0.00    0.00       1+24546   quickSort [8]
                 0.00    0.00   12273/12273       partition [7]
+                               24546             quickSort [8]
 ```
 
 Two things to read here:
@@ -474,7 +484,7 @@ counters are from Cachegrind; the hotspot is from gprof.
 | Swaps | 82,757,197 | 161,906 | **511×** |
 | CPU cycles | *no PMU (§7.1)* | *no PMU* | — |
 | IPC | *no PMU (§7.1)* | *no PMU* | — |
-| Hotspot function | `bubbleSort` 73.53%<br>(`swap` 23.53%) | `partition` 78.57% | — |
+| Hotspot function | `bubbleSort` 69.57%<br>(`swap` 23.91%) | `partition` 78.57% | — |
 
 Three things in this table are worth more than the headline ratio.
 
@@ -668,8 +678,8 @@ moves an element one position; quicksort's partitioning moves elements a long
 way toward their final position, so it never revisits the same pair.
 
 **2. Which function consumed the maximum execution time?**
-For the baseline, `bubbleSort` at **73.53%** of CPU time, with `swap` second at
-**23.53%** across **82,919,103 calls**. For quicksort (profiled at N = 4,000,000
+For the baseline, `bubbleSort` at **69.57%** of CPU time, with `swap` second at
+**23.91%** across **82,919,103 calls**. For quicksort (profiled at N = 4,000,000
 so gprof can resolve it), `partition` at **78.57%** — expected, since partition
 is where every comparison happens. At `-O2` `swap` disappears from the profile
 entirely because it is inlined; at `-O3` even `bubbleSort` is inlined into its
