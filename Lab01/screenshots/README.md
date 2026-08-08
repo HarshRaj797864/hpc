@@ -1,20 +1,23 @@
 # Screenshots
 
-Capture these yourself — a screenshot is evidence that *you* ran the tool on
-*your* machine, so generating them automatically would defeat the purpose.
+Terminal captures evidencing each step of the lab. The lab sheet asks only for
+a `screenshots/` folder and specifies no count; the **core set** below covers
+every explicit "Record the following" instruction in the brief, and the
+**optional set** supports the extra analysis in `../README.md`.
 
-## Run this first — in the same terminal you take the screenshots from
+**Run every command from `Lab01/`, not from this folder** — the reports and
+binaries live one level up.
 
-`$PERF` only exists in the shell where you export it. If you open a new tab, or
-skip straight to a table row below, `$PERF --version` becomes bare `--version`
-and bash reports `command not found`. Re-run this block if that happens.
+## Setup — run this first, in the same terminal
 
-On WSL2 the plain `perf` wrapper cannot find a binary matching the running
-kernel, so we locate the versioned one instead:
+`$PERF` only exists in the shell where you export it. Open a new tab and it is
+gone, and `$PERF stat ...` silently becomes `stat ...`.
 
 ```bash
+cd ~/programming-playground/repos/hpc/Lab01
+
 export PERF=$(ls /usr/lib/linux-tools-*/perf | head -1)
-echo "$PERF"          # should print a path, not an empty line
+echo "$PERF"          # must print a path, not an empty line
 
 gcc -O0 -pg mysort.c -o mysort
 gcc -O2 -pg mysort.c -o mysort_O2
@@ -24,53 +27,113 @@ gcc -O2 -DCOUNTERS mysort.c -o mysort_counters
 gcc -O2 -fopenmp mysort.c -o mysort_omp
 ```
 
-The lab sheet asks only for a `screenshots/` folder — it does **not** specify a
-count. The list below is split accordingly.
+---
 
-## Core set — the lab's own "Record the following" steps
+## Core set
 
-Capture these eleven and every explicit instruction in the brief is evidenced.
+### 01_versions.png — Software Requirements
+```bash
+gcc --version && gprof --version && $PERF --version
+```
 
-| # | Filename | Command | Covers which lab step |
-|---|---|---|---|
-| 1 | `01_versions.png` | `gcc --version && gprof --version && $PERF --version` | Software Requirements |
-| 2 | `02_compile.png` | `gcc -O0 -pg mysort.c -o mysort` | Compile the Program |
-| 3 | `03_run_O0.png` | `./mysort` | Execute the Program |
-| 4 | `04_time_O0.png` | `time ./mysort` | Record Real / User / Sys time |
-| 5 | `05_gprof_flat_O0.png` | `gprof ./mysort gmon.out > myreport.txt && head -20 myreport.txt` | Max-CPU function, % CPU, call counts |
-| 6 | `06_gprof_callgraph_O0.png` | `sed -n '/Call graph/,/^Index/p' myreport.txt \| head -45` | Call Graph |
-| 7 | `07_perf_stat_O0.png` | `$PERF stat -e task-clock,context-switches,page-faults,cycles,instructions,cache-references,cache-misses,branch-instructions,branch-misses ./mysort` | Hardware statistics |
-| 8 | `08_gprof_O2.png` | `./mysort_O2 && gprof ./mysort_O2 gmon.out > report_O2.txt && head -12 report_O2.txt` | -O2 report |
-| 9 | `09_perf_stat_O2.png` | `$PERF stat ./mysort_O2` | -O2 hardware statistics |
-| 10 | `10_gprof_O3.png` | `./mysort_O3 && gprof ./mysort_O3 gmon.out > report_O3.txt && head -12 report_O3.txt` | -O3 report |
-| 11 | `11_perf_stat_O3.png` | `$PERF stat ./mysort_O3` | -O3 hardware statistics |
+### 02_run_O0.png — Compile and Execute
+```bash
+gcc -O0 -pg mysort.c -o mysort && ./mysort
+```
 
-## Supporting set — optional
+### 03_time_O0.png — Record Real / User / Sys time
+```bash
+time ./mysort
+```
 
-These back up analysis that goes beyond the brief. Skip any of them and the
-deliverable is still complete; #12 and #14 are the two most worth having,
-since they evidence the report's headline claims.
+### 04_gprof_flat_O0.png — Max-CPU function, % CPU, call counts
+```bash
+gprof ./mysort gmon.out > myreport.txt && head -20 myreport.txt
+```
 
-| # | Filename | Command | Supports |
-|---|---|---|---|
-| 12 | `12_cachegrind.png` | `valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes ./mysort_bench 18250 --bubble-only` | §7.2–7.3, the counters the PMU cannot give |
-| 13 | `13_counters.png` | `./mysort_counters` | §6.3 comparison/swap counts |
-| 14 | `14_bubble_1M.png` | `./mysort_bench 1000000 --bubble-only` (~15 min) | §9, the 871.8 s headline |
-| 15 | `15_quick_1M.png` | `./mysort_bench 1000000 --quick-only --repeat 5` | §9, the 0.070 s counterpart |
-| 16 | `16_gprof_quick_4M.png` | `./mysort 4000000 --quick-only && gprof ./mysort gmon.out \| head -12` | §6.4, quicksort's own hotspot |
-| 17 | `17_parallel.png` | `./mysort_omp 4000000 --quick-only --parallel` | §10, parallel feasibility |
+### 05_perf_stat_O0.png — Hardware statistics
+```bash
+$PERF stat -e task-clock,context-switches,page-faults,cycles,instructions,cache-references,cache-misses,branch-instructions,branch-misses ./mysort
+```
 
-## Note on the perf screenshots (7, 9, 11)
+### 06_gprof_O2.png — -O2 profile
+```bash
+./mysort_O2 && gprof ./mysort_O2 gmon.out > report_O2.txt && head -12 report_O2.txt
+```
 
-`perf stat` on this machine reports `<not supported>` for every hardware counter
-(cycles, instructions, cache references/misses, branch misses), because the WSL2
-kernel exposes no virtual PMU. **That output is itself the result** — capture it
-as-is. Screenshot 11 shows the underlying cause at the syscall level. See
-README §7.
+### 07_perf_stat_O2.png — -O2 hardware statistics
+```bash
+$PERF stat ./mysort_O2
+```
 
-To capture real hardware counters, run these on native, non-virtualised Linux.
+### 08_gprof_O3.png — -O3 profile
+```bash
+./mysort_O3 && gprof ./mysort_O3 gmon.out > report_O3.txt && head -12 report_O3.txt
+```
 
-## Note on screenshots 14 and 15
+### 09_perf_stat_O3.png — -O3 hardware statistics
+```bash
+$PERF stat ./mysort_O3
+```
 
-These are the headline comparison: bubble sort takes **871.8 s** on 1,000,000
-records, quicksort **0.070 s** on the same array.
+### 10_gprof_callgraph_O0.png — Call Graph
+The brief lists "Call Graph" explicitly under *Record the following*.
+```bash
+sed -n '/Call graph/,/^Index/p' myreport.txt | head -45
+```
+
+---
+
+## Optional set
+
+Supporting evidence for analysis beyond the brief. Skipping these leaves the
+deliverable complete.
+
+### 11_cachegrind.png — §7.2–7.3, the counters the PMU cannot provide
+```bash
+valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes ./mysort_bench 18250 --bubble-only
+```
+
+### 12_counters.png — §6.3, exact comparison and swap counts
+```bash
+./mysort_counters
+```
+
+### 13_bubble_1M.png — §9, the 871.8 s headline (takes ~15 minutes)
+```bash
+./mysort_bench 1000000 --bubble-only
+```
+
+### 14_quick_1M.png — §9, the 0.070 s counterpart
+```bash
+./mysort_bench 1000000 --quick-only --repeat 5
+```
+
+### 15_gprof_quick_4M.png — §6.4, quicksort's own hotspot
+```bash
+./mysort 4000000 --quick-only && gprof ./mysort gmon.out | head -12
+```
+
+### 16_parallel.png — §10, parallel feasibility
+```bash
+./mysort_omp 4000000 --quick-only --parallel
+```
+
+---
+
+## Note on the perf screenshots (05, 07, 09)
+
+`perf stat` reports `<not supported>` for every hardware counter — cycles,
+instructions, cache references/misses, branch misses — because this WSL2 kernel
+exposes no virtual PMU. **That output is itself the result**; capture it as-is.
+See `../README.md` §7.1 for the `perf_event_open` evidence, and §7.2 for the
+Cachegrind measurements that fill the gap.
+
+Real hardware counters require native, non-virtualised Linux.
+
+## Note on gprof percentages
+
+The `% time` column is sampled and shifts a few points between runs; the
+`calls` column is exact instrumentation and does not. If a screenshot shows
+`bubbleSort` at a slightly different percentage from `../README.md`, that is
+expected and explained in §6.1.
