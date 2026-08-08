@@ -1,0 +1,13 @@
+# compiled binaries
+mysort
+mysort_O2
+mysort_O3
+mysort_bench
+mysort_bench_O0
+mysort_counters
+mysort_omp
+perf_probe
+
+# profiler raw output (regenerate with ./run_lab.sh)
+gmon.out
+cachegrind_*.out

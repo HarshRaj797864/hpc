@@ -1,0 +1,9 @@
+opt,algorithm,wall_seconds
+-O0,Bubble Sort,0.337268
+-O0,Quick Sort,0.113181
+-O1,Bubble Sort,0.165162
+-O1,Quick Sort,0.054822
+-O2,Bubble Sort,0.166097
+-O2,Quick Sort,0.058705
+-O3,Bubble Sort,0.519706
+-O3,Quick Sort,0.062298
