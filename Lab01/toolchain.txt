@@ -1,5 +1,0 @@
-gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
-GNU gprof (GNU Binutils for Ubuntu) 2.38
-./run_lab.sh: line 24: perf: command not found
-kernel: 6.18.33.2-microsoft-standard-WSL2
-cpu:    12th Gen Intel(R) Core(TM) i7-1255U

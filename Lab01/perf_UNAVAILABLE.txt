@@ -1,4 +1,0 @@
-perf is not installed on this machine.
-Kernel: 6.18.33.2-microsoft-standard-WSL2
-See README section 6 for the PMU availability probe and the substitute
-measurements used in its place.

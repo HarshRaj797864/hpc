@@ -39,26 +39,50 @@ optimization closes it.
 
 ```
 Lab01/
-├── mysort.c              # the program: both sorts + timing harness
-├── run_lab.sh            # reproduces every measurement in this report
-├── README.md             # this document
-├── report.pdf            # PDF rendering of this document
-├── myreport.txt          # gprof report, -O0
-├── report_O2.txt         # gprof report, -O2
-├── report_O3.txt         # gprof report, -O3
-├── report_quick_4M.txt   # gprof report, quicksort-only at N=4,000,000
-├── scaling.csv           # problem-size study, raw data
-├── opt_sweep.csv         # optimization-level study, raw data
-├── counters.txt          # exact comparison/swap counts
-├── time_O0/O2/O3.txt     # `time` output, 3 runs each
-└── screenshots/          # terminal captures
+│── mysort.c          # the program: both sorts + timing harness
+│── README.md         # this document
+│── report.pdf        # PDF rendering of this document
+│── myreport.txt      # gprof report, -O0
+│── report_O2.txt     # gprof report, -O2
+│── report_O3.txt     # gprof report, -O3
+│── screenshots/      # terminal captures
 ```
 
-Reproduce everything with:
+Every measured number in this report is reproduced in the tables below, so the
+raw intermediate files are not carried in the repository.
+
+## Reproducing the results
 
 ```bash
-./run_lab.sh            # ~3 minutes
-./run_lab.sh --with-1m  # also runs bubble sort on 1,000,000 records (~15 min)
+# Build at all three optimization levels
+gcc -O0 -pg mysort.c -o mysort
+gcc -O2 -pg mysort.c -o mysort_O2
+gcc -O3 -pg mysort.c -o mysort_O3
+
+# Run, time, and profile each (gmon.out is overwritten by every run,
+# so generate each report immediately after its own run)
+./mysort      && time ./mysort      && gprof ./mysort    gmon.out > myreport.txt
+./mysort_O2   && time ./mysort_O2   && gprof ./mysort_O2 gmon.out > report_O2.txt
+./mysort_O3   && time ./mysort_O3   && gprof ./mysort_O3 gmon.out > report_O3.txt
+
+# Hardware counters (see section 7 for why these are unavailable here)
+perf stat ./mysort
+```
+
+Additional experiments cited in this report:
+
+```bash
+gcc -O2 mysort.c -o mysort_bench                # clean timing, no -pg overhead
+gcc -O2 -DCOUNTERS mysort.c -o mysort_counters  # exact comparison/swap counts
+gcc -O2 -fopenmp mysort.c -o mysort_omp         # parallel quicksort
+
+./mysort_counters                                # section 6.3
+./mysort_bench 1000000 --bubble-only             # section 9  (~15 minutes)
+./mysort_bench 1000000 --quick-only --repeat 5   # section 9
+./mysort_omp 4000000 --quick-only --parallel     # section 10
+
+# Section 6.4: profile quicksort alone at a size gprof can actually sample
+./mysort 4000000 --quick-only && gprof ./mysort gmon.out > report_quick_4M.txt
 ```
 
 ---
@@ -248,8 +272,8 @@ Quicksort therefore collects *zero* samples and its self-time prints as
 resolution. **A profiler cannot measure what finishes faster than its sampling
 period.**
 
-Re-profiling quicksort alone at N = 4,000,000 (`report_quick_4M.txt`) makes it
-measurable:
+Re-profiling quicksort alone at N = 4,000,000 —
+`./mysort 4000000 --quick-only`, then `gprof` — makes it measurable:
 
 ```
   %   cumulative   self              self     total
@@ -304,6 +328,42 @@ SW page-faults         : OK
 Every **hardware** event is rejected at the syscall; every **software** event
 works. `perf stat` would print `<not supported>` for exactly the rows the lab
 asks us to record.
+
+The probe is a dozen lines — save as `perf_probe.c`, build with
+`gcc -O0 perf_probe.c -o perf_probe`, and run it to reproduce the output above:
+
+```c
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/perf_event.h>
+
+static void try1(const char *name, unsigned type, unsigned long long cfg)
+{
+    struct perf_event_attr a;
+    int fd;
+    memset(&a, 0, sizeof a);
+    a.size = sizeof a; a.type = type; a.config = cfg;
+    a.disabled = 1; a.exclude_kernel = 1; a.exclude_hv = 1;
+    fd = syscall(__NR_perf_event_open, &a, 0, -1, -1, 0);
+    printf("%-22s : %s\n", name, fd < 0 ? strerror(errno) : "OK");
+    if (fd >= 0) close(fd);
+}
+
+int main(void)
+{
+    try1("HW cpu-cycles",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
+    try1("HW instructions",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
+    try1("HW cache-refs",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES);
+    try1("HW branch-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
+    try1("SW task-clock",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK);
+    try1("SW page-faults",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS);
+    return 0;
+}
+```
 
 **To collect real hardware counters**, run on native (non-virtualised) Linux:
 
@@ -396,7 +456,7 @@ profitable on average and harmful on specific code shapes. Always measure.
 
 # 9. Effect of problem size
 
-Wall-clock seconds, `-O2`, no `-pg` (from `scaling.csv`):
+Wall-clock seconds, `-O2`, no `-pg`, best-of measurements:
 
 | N | Bubble Sort | Ratio | Quick Sort | Ratio |
 |---:|---:|---:|---:|---:|
