@@ -65,8 +65,13 @@ gcc -O3 -pg mysort.c -o mysort_O3
 ./mysort_O2   && time ./mysort_O2   && gprof ./mysort_O2 gmon.out > report_O2.txt
 ./mysort_O3   && time ./mysort_O3   && gprof ./mysort_O3 gmon.out > report_O3.txt
 
-# Hardware counters (see section 7 for why these are unavailable here)
-perf stat ./mysort
+# Hardware counters. On WSL2 the perf wrapper cannot find a matching binary,
+# so call the versioned one directly (see section 7.1).
+/usr/lib/linux-tools-5.15.0-187/perf stat ./mysort
+
+# Simulated counters - instructions, cache refs/misses, branch misses (7.2)
+valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
+         ./mysort_bench 18250 --bubble-only
 ```
 
 Additional experiments cited in this report:
@@ -96,7 +101,8 @@ gcc -O2 -fopenmp mysort.c -o mysort_omp         # parallel quicksort
 | Kernel | 6.18.33.2-microsoft-standard-WSL2 |
 | GCC | 11.4.0 (Ubuntu 11.4.0-1ubuntu1~22.04.3) |
 | GNU gprof | 2.38 |
-| perf | see §7 — hardware counters are **unavailable on this kernel** |
+| perf | 5.15.209 — software counters only; **no PMU on this kernel** (§7.1) |
+| valgrind | 3.18.1 — Cachegrind supplies the simulated counters (§7.2) |
 
 Cache sizes matter later: 18,250 `int`s = **73 KB** (fits in L2), 1,000,000
 `int`s = **4 MB** (fits in L3), 4,000,000 `int`s = **16 MB** (**exceeds** the
@@ -326,8 +332,59 @@ SW page-faults         : OK
 ```
 
 Every **hardware** event is rejected at the syscall; every **software** event
-works. `perf stat` would print `<not supported>` for exactly the rows the lab
-asks us to record.
+works. `perf stat` prints `<not supported>` for exactly the rows the lab asks us
+to record — confirmed by running it:
+
+```
+ Performance counter stats for './mysort':
+
+            878.03 msec task-clock:u       #    0.997 CPUs utilized
+                 0      context-switches:u #    0.000 /sec
+                99      page-faults:u      #  112.753 /sec
+   <not supported>      cycles:u
+   <not supported>      instructions:u
+   <not supported>      cache-references:u
+   <not supported>      cache-misses:u
+   <not supported>      branch-instructions:u
+   <not supported>      branch-misses:u
+
+       0.880703603 seconds time elapsed
+       0.877037000 seconds user
+       0.000000000 seconds sys
+```
+
+The software counters are useful even so. Across the three builds they
+independently corroborate the timings in §5 and §8 — including the `-O3`
+regression, measured here by a tool with no connection to this program's own
+timing code:
+
+| Build | task-clock | page-faults | context-switches |
+|---|---:|---:|---:|
+| `-O0 -pg` | 878.03 ms | 99 | 0 |
+| `-O2 -pg` | **171.78 ms** | 99 | 0 |
+| `-O3 -pg` | 497.54 ms | 98 | 0 |
+
+Zero context switches and ~99 page faults regardless of optimization level: the
+process is never descheduled and touches the same memory, so the entire
+difference between these builds is instruction cost, not system behaviour.
+
+### Getting `perf` to run at all on WSL2
+
+Ubuntu's `perf` wrapper looks for a binary matching the *exact* running kernel
+and fails, suggesting packages that do not exist for WSL2 kernels:
+
+```
+WARNING: perf not found for kernel 6.18.33.2-microsoft
+  You may need to install ... linux-tools-6.18.33.2-microsoft-standard-WSL2
+```
+
+Install the generic tools and call the versioned binary directly — the
+`perf stat` interface is stable enough across this version gap:
+
+```bash
+sudo apt install -y linux-tools-generic
+/usr/lib/linux-tools-5.15.0-187/perf stat ./mysort
+```
 
 The probe is a dozen lines — save as `perf_probe.c`, build with
 `gcc -O0 perf_probe.c -o perf_probe`, and run it to reproduce the output above:
@@ -372,73 +429,70 @@ perf stat -e task-clock,context-switches,page-faults,cycles,instructions,\
 cache-references,cache-misses,branch-instructions,branch-misses ./mysort
 ```
 
-## 7.2 What could and could not be measured
+## 7.2 Filling the gap with Cachegrind
 
-Being explicit about this, because a comparison table with invented numbers is
-worse than one with honest gaps:
-
-| Metric | Status on this machine |
-|---|---|
-| Execution time | **Measured** — `CLOCK_MONOTONIC` + `time` (§5) |
-| Hotspot function | **Measured** — gprof (§6) |
-| Instruction count | **Not measured.** Exact *operation* counts stand in — 166,521,222 vs 302,516 comparisons (§6.3) |
-| CPU cycles | **Not measured** — no PMU |
-| IPC | **Not measured** — needs both cycles and instructions |
-| Cache references / misses | **Not measured directly.** Cache *effects* are visible in timing (§9) |
-| Branch misses | **Not measured** — no PMU |
-
-Three of the seven rows the lab asks for cannot be filled on this hardware, and
-no substitute tool was run. What partially covers the gap:
-
-- **Instruction count → operation count.** The `-DCOUNTERS` build counts
-  comparisons and swaps exactly (§6.3), which is the algorithmically meaningful
-  quantity. It is not an instruction count, but it explains the performance
-  difference better than one would: 550× more comparisons.
-- **Cache behaviour → timing evidence.** §9 shows quicksort tracking n log n
-  closely up to ~2 M elements, then drifting above prediction (2.29×, 2.50× per
-  doubling against ~2.09× predicted) exactly as the working set passes the 12 MB
-  L3. That is empirical evidence of cache pressure inferred from timing, not a
-  miss-rate measurement.
-
-**To fill the table properly**, either run on native (non-virtualised) Linux
-with the `perf stat` command in §7.1, or simulate the counters with Cachegrind,
-which does not need a PMU:
+Cachegrind recovers everything the missing PMU costs us except cycles, because
+it *simulates* a cache and branch-predictor model instead of reading hardware:
 
 ```bash
 sudo apt install -y valgrind
 valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
-         ./mysort_bench 8000 --bubble-only
+         ./mysort_bench 18250 --bubble-only
 valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes \
-         ./mysort_bench 8000 --quick-only
+         ./mysort_bench 18250 --quick-only
 ```
 
-Cachegrind reports instruction counts (`Ir`), cache references and misses
-(`D1`, `LLd`) and branch mispredictions (`Bcm`). Note it *simulates* a cache
-model rather than reading hardware counters — the numbers are architecturally
-faithful but not cycle-exact, and it runs roughly 50× slower than native, hence
-the reduced N.
+Read these as architecturally faithful but not cycle-exact — a model of this
+cache hierarchy, not a measurement of it. Cachegrind also runs ~50× slower than
+native, which is why N stays at 18,250.
+
+**Cycles and IPC remain genuinely unobtainable.** Both need a real cycle
+counter, and no simulator can supply one. Those two rows stay empty rather than
+being filled with a guess.
 
 ## 7.3 Performance comparison table
 
-The comparison the lab asks for, at N = 18,250, `-O2` without `-pg`:
+The comparison the lab asks for, at N = 18,250. Timing is `-O2` without `-pg`;
+counters are from Cachegrind; the hotspot is from gprof.
 
 | Metric | Bubble Sort | Quick Sort | Ratio |
 |---|---:|---:|---:|
 | Execution time | 0.174504 s | 0.000932 s | **187×** |
-| CPU cycles | *unavailable — no PMU* | *unavailable* | — |
-| Instructions | *unavailable — no PMU* | *unavailable* | — |
-| IPC | *unavailable — no PMU* | *unavailable* | — |
-| Cache references | *unavailable — no PMU* | *unavailable* | — |
-| Cache misses | *unavailable — no PMU* | *unavailable* | — |
-| Branch misses | *unavailable — no PMU* | *unavailable* | — |
-| **Comparisons** (measured) | 166,521,222 | 302,516 | **550×** |
-| **Swaps** (measured) | 82,757,197 | 161,906 | **511×** |
-| **Hotspot function** | `bubbleSort` 73.53%<br>(`swap` 23.53%) | `partition` 78.57% | — |
+| Instructions (`I refs`) | 2,085,040,959 | 8,050,471 | **259×** |
+| Cache references (`D refs`) | 500,186,897 | 2,528,599 | **198×** |
+| Cache misses (`D1`) | 5,317,138 | 10,479 | **507×** |
+| Last-level misses | 5,874 | 5,894 | **1.00×** |
+| Branches | 333,822,603 | 1,384,092 | **241×** |
+| Branch misses | 18,233,440 | 116,034 | **157×** |
+| Branch miss *rate* | 5.5% | 8.4% | 0.65× |
+| Comparisons | 166,521,222 | 302,516 | **550×** |
+| Swaps | 82,757,197 | 161,906 | **511×** |
+| CPU cycles | *no PMU (§7.1)* | *no PMU* | — |
+| IPC | *no PMU (§7.1)* | *no PMU* | — |
+| Hotspot function | `bubbleSort` 73.53%<br>(`swap` 23.53%) | `partition` 78.57% | — |
 
-The rows marked unavailable are a property of this machine (§7.1), not an
-omission. The two measured operation-count rows carry the same explanatory
-weight the instruction count would have: bubble sort loses because it does 550×
-more work, and that conclusion does not depend on a PMU.
+Three things in this table are worth more than the headline ratio.
+
+**Last-level misses are identical — 5,874 vs 5,894.** At N = 18,250 the array is
+73 KB, which fits comfortably in the 1.25 MB L2. Both algorithms pay the same
+compulsory misses to load it once and neither thrashes. **Cache behaviour is not
+why bubble sort loses at this size** — it loses purely on instruction count.
+That is worth stating plainly, because "it must be a cache problem" is the
+reflexive explanation for slow code, and here it is measurably wrong. (Cache
+*does* become decisive at large N — see §9, where quicksort drifts above its
+n log n prediction once the working set passes the 12 MB L3.)
+
+**Bubble sort has the *better* branch prediction rate — 5.5% vs 8.4% — and still
+loses by 157× on absolute mispredictions.** Quicksort's partition comparison is
+close to a coin flip and genuinely hard to predict, while bubble sort's
+`arr[j] > arr[j+1]` becomes increasingly predictable as the data gets sorted.
+Bubble sort is *better* at the thing branch predictors reward, and it does not
+help, because it executes 241× more branches. A good rate on a huge volume loses
+to a poor rate on a small one.
+
+**2.085 billion instructions versus 8.05 million.** This is the instruction-count
+row the PMU could not give us, and it lands where the comparison counts said it
+would.
 
 ---
 

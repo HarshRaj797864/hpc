@@ -3,9 +3,12 @@
 Capture these yourself — a screenshot is evidence that *you* ran the tool on
 *your* machine, so generating them automatically would defeat the purpose.
 
-Build first:
+Build first, and set `$PERF` — on WSL2 the plain `perf` wrapper fails to find a
+binary matching the running kernel, so call the versioned one directly:
 
 ```bash
+export PERF=/usr/lib/linux-tools-5.15.0-187/perf   # adjust if your version differs
+
 gcc -O0 -pg mysort.c -o mysort
 gcc -O2 -pg mysort.c -o mysort_O2
 gcc -O3 -pg mysort.c -o mysort_O3
@@ -16,7 +19,7 @@ gcc -O2 -fopenmp mysort.c -o mysort_omp
 
 | # | Filename | Command to run and capture |
 |---|---|---|
-| 1 | `01_versions.png` | `gcc --version && gprof --version && perf --version` |
+| 1 | `01_versions.png` | `gcc --version && gprof --version && $PERF --version` |
 | 2 | `02_compile.png` | `gcc -O0 -pg mysort.c -o mysort` |
 | 3 | `03_run_O0.png` | `./mysort` |
 | 4 | `04_time_O0.png` | `time ./mysort` |
@@ -25,8 +28,8 @@ gcc -O2 -fopenmp mysort.c -o mysort_omp
 | 7 | `07_gprof_O2.png` | `./mysort_O2 && gprof ./mysort_O2 gmon.out > report_O2.txt && head -12 report_O2.txt` |
 | 8 | `08_gprof_O3.png` | `./mysort_O3 && gprof ./mysort_O3 gmon.out > report_O3.txt && head -12 report_O3.txt` |
 | 9 | `09_gprof_quick_4M.png` | `./mysort 4000000 --quick-only && gprof ./mysort gmon.out \| head -12` |
-| 10 | `10_perf_stat.png` | `perf stat ./mysort` |
-| 11 | `11_pmu_probe.png` | `./perf_probe` (source is in README §7.1) |
+| 10 | `10_perf_stat.png` | `$PERF stat -e task-clock,context-switches,page-faults,cycles,instructions,cache-references,cache-misses,branch-instructions,branch-misses ./mysort` |
+| 11 | `11_cachegrind.png` | `valgrind --tool=cachegrind --branch-sim=yes --cache-sim=yes ./mysort_bench 18250 --bubble-only` |
 | 12 | `12_counters.png` | `./mysort_counters` |
 | 13 | `13_bubble_1M.png` | `./mysort_bench 1000000 --bubble-only` (~15 minutes) |
 | 14 | `14_quick_1M.png` | `./mysort_bench 1000000 --quick-only --repeat 5` |
