@@ -1,0 +1,33 @@
+# compiled binaries
+mysort
+mysort_O0
+mysort_O1
+mysort_O2
+mysort_O3
+mysort_bench
+mysort_bench_O0
+mysort_counters
+mysort_omp
+mysort_O3_novect
+mysort_O3_noifconv
+perf_probe
+
+# profiler data
+gmon.out
+cachegrind*.out
+callgrind*.out
+
+# results directory (written at runtime, not needed in image)
+results/
+
+# screenshots (large PNGs, not needed in container)
+screenshots/
+
+# git
+.git/
+.gitignore
+
+# docs (not needed in container)
+report.pdf
+README.md
+*.txt

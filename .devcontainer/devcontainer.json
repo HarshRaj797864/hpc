@@ -1,0 +1,50 @@
+{
+    "name": "HPC Lab — gprof + perf + valgrind",
+
+    // Use our own Dockerfile so we control exactly what's installed
+    "build": {
+        "context": "../Lab01",
+        "dockerfile": "../Lab01/Dockerfile"
+    },
+
+    // ── Capabilities required for perf hardware counters ──────────────────
+    // SYS_ADMIN  : allows perf_event_open() for hardware events
+    // SYS_PTRACE : allows gprof / strace / gdb attach
+    // IPC_LOCK   : allows pinning memory for perf buffers
+    "runArgs": [
+        "--cap-add=SYS_ADMIN",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=IPC_LOCK",
+        "--security-opt", "seccomp=unconfined"
+    ],
+
+    // Lower perf_event_paranoid so unprivileged perf works
+    // (-1 = allow all, 0 = allow HW counters without CAP_SYS_ADMIN)
+    "initializeCommand": "echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid 2>/dev/null || true",
+
+    // ── Mount the whole repo into the container ───────────────────────────
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "workspaceFolder": "/workspace",
+
+    // ── Install extra VS Code extensions for a good experience ────────────
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "timonwong.shellcheck"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.fontSize": 14,
+                "editor.fontSize": 14
+            }
+        }
+    },
+
+    // ── Post-create: set perf_event_paranoid and show environment ─────────
+    "postCreateCommand": "bash /workspace/.devcontainer/setup.sh",
+
+    // Run as root so perf_event_open has no permission issues
+    "remoteUser": "root"
+}
